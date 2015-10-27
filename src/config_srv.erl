@@ -140,14 +140,25 @@ handle_call({update_config, file} ,_From, Config)->
 handle_call({update_config, json, Json} ,_From, _Config)->
    NewConfig = mochijson2:decode(Json),
    Fun =
-   fun(Fun, {struct, Array})-> [{Name, Fun(Fun, X)} || {Name, X} <- Array ];
+   fun(Fun, {struct, Array})-> 
+        lists:flatten(
+        [case is_list(X) of 
+         true -> 
+            [{Name, Fun(Fun, V)} || V <-X]
+         ;
+         false -> 
+            {Name, Fun(Fun, X)} 
+         end
+        || {Name, X} <- Array ]);
+      
       (Fun, Array) when is_list(Array)-> [Fun(Fun, Y) || Y<-Array]; 
       (_, Int) when is_integer(Int)-> Int; 
-      (_, Bin) when is_binary(Bin)-> 
-                 list_to_atom(binary_to_list(Bin)) 
+      (_, Bin) when is_binary(Bin)-> Bin
    end,
    {reply,ok, Fun(Fun, NewConfig)}
 .
+
+
 handle_cast(_Msg, Config) ->
   {noreply, Config}.
 
@@ -248,20 +259,31 @@ save_config(file)->
   case lists:keyfind(conf,1,Argx) of
     false-> error;
     {conf,Path}->
-      {ok, File} = file:open(Path, write),
-      [io:format(File, '~p{\n~s}\n',[X, 
-		[case C of 
-                 argv -> io_lib:format('\t~s = "~s";\n',[C, V]);
-                 _ -> io_lib:format('\t~s = ~s;\n',[C, V])
-                 end
-                || {C, V} <- Y] ]) 
-      || {X,Y} <- get_config()],
-      file:close(File),
+      Data = iolist_to_binary(encode_config(get_config())),
+      file:write_file(Path,Data),
       ok
   end
 ;
 save_config(_)->
   error
+.
+
+get_tabs(Level)->
+    [$\t || _ <- lists:seq(1,Level)]
+.
+
+encode_config(Config)->
+    encode_config(Config,0)
+.
+encode_config([],_Level)->
+    ""
+;
+encode_config([{Key,Value}|Tail],Level) when is_binary(Value) ->
+    io_lib:format('~s~s = "~s";\n',[get_tabs(Level),Key, Value]) ++ encode_config(Tail,Level)
+;
+encode_config([{Key,Value}|Tail],Level) when is_list(Value) ->
+    Tabs = get_tabs(Level),
+    io_lib:format('~s~s{\n~s~s}\n',[Tabs, Key, encode_config(Value,Level+1),Tabs]) ++ encode_config(Tail,Level)
 .
 
 -spec update_config( Value :: term() ) -> ok. 
@@ -288,6 +310,31 @@ apply(App)->
 get_config()->
    gen_server:call({global, ?MODULE}, all).
 
+get_config(json)->
+   Config = get_config(),
+   Fun =
+   fun(_Fun,[],Res) -> Res;
+      (Fun,[{Key,Value}|Tail],Res) when is_binary(Value) -> 
+        Fun(Fun, Tail, Res ++ [{Key, Value}]);
+      (Fun,[{Key,Value}|Tail],Res) when is_list(Value) -> 
+        NewRes = 
+        case lists:keyfind(Key,1,Res) of
+        false -> 
+            Res ++ [{Key,{struct, Fun(Fun, Value,[])}}]
+        ;
+        {Key, Val} when is_list(Val) ->
+            NewVal = Val ++ [{struct, Fun(Fun, Value,[])}],
+            lists:keyreplace(Key,1,Res, {Key, NewVal})
+        ;
+        {Key, Val} ->
+            NewVal = [Val] ++ [{struct, Fun(Fun, Value,[])}],
+            lists:keyreplace(Key,1,Res, {Key, NewVal})
+        end,
+        Fun(Fun, Tail, NewRes);
+      (Fun,[List],Res) when is_list(List) -> [Fun(Fun, List, [])]
+   end,
+   Fun(Fun, Config, [])
+;
 get_config(Val) when is_atom(Val)->
    get_config(list_to_binary(atom_to_list(Val)))
 ;
@@ -304,6 +351,7 @@ get_config(Val) when is_binary(Val)->
      List -> List ++ application:get_all_env(Val)
    end
 .
+
 get_config(global, Val) ->
     get_config(Val)
 ;
