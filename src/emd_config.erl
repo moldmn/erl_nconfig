@@ -23,7 +23,7 @@ parse(Input) when is_binary(Input) ->
 
 'section'(Input, Index) ->
   p(Input, Index, 'section', fun(I,D) -> (p_seq([p_zero_or_more(p_choose([fun 'freeline'/2, fun 'space'/2])), p_label('block', fun 'word'/2), p_zero_or_more(p_choose([fun 'freeline'/2, fun 'space'/2])), p_string(<<"{">>), p_zero_or_more(p_choose([fun 'freeline'/2, fun 'space'/2])), p_zero_or_more(fun 'crlf'/2), p_zero_or_more(p_choose([p_seq([p_zero_or_more(p_choose([fun 'freeline'/2, fun 'space'/2])), p_label('cwd', fun 'commandline'/2)]), fun 'comment'/2, p_seq([p_label('sec', fun 'section'/2), p_zero_or_more(fun 'crlf'/2)])])), p_string(<<"}">>), p_zero_or_more(p_choose([fun 'freeline'/2, fun 'space'/2])), p_zero_or_more(fun 'crlf'/2)]))(I,D) end, fun(Node, Idx) -> 
-    {binary_to_atom(proplists:get_value(block, Node), latin1),
+    {proplists:get_value(block, Node),
         [X || {cwd,X} <-lists:flatten(Node) ] ++
         [ X|| {sec, X} <- lists:flatten(Node)]
     }
@@ -33,8 +33,8 @@ parse(Input) when is_binary(Input) ->
 'commandline'(Input, Index) ->
   p(Input, Index, 'commandline', fun(I,D) -> (p_seq([p_zero_or_more(p_choose([fun 'freeline'/2, fun 'space'/2])), p_label('comm', fun 'command'/2), p_zero_or_more(fun 'space'/2), p_string(<<"=">>), p_zero_or_more(fun 'space'/2), p_choose([p_label('param', fun 'argv'/2), p_label('param', fun 'parameter'/2)]), p_zero_or_more(fun 'space'/2), fun 'delimeter'/2]))(I,D) end, fun(Node, Idx) -> 
     {
-        binary_to_atom(proplists:get_value(comm,Node),latin1),
-        binary_to_atom(proplists:get_value(param,Node),latin1)
+        proplists:get_value(comm,Node),
+        proplists:get_value(param,Node)
     }
  end).
 
@@ -60,12 +60,12 @@ parse(Input) when is_binary(Input) ->
  end).
 
 'word'(Input, Index) ->
-  p(Input, Index, 'word', fun(I,D) -> (p_one_or_more(p_charclass(<<"[a-zA-Z0-9@_.-]">>)))(I,D) end, fun(Node, Idx) -> 
+  p(Input, Index, 'word', fun(I,D) -> (p_one_or_more(p_charclass(<<"[a-zA-Z0-9?@_.-]">>)))(I,D) end, fun(Node, Idx) -> 
     iolist_to_binary(Node)
  end).
 
 'argv'(Input, Index) ->
-  p(Input, Index, 'argv', fun(I,D) -> (p_seq([p_string(<<"\"">>), p_zero_or_more(p_charclass(<<"[a-zA-Z0-9.:=_\\s\t\\/-]">>)), p_string(<<"\"">>)]))(I,D) end, fun(Node, Idx) -> 
+  p(Input, Index, 'argv', fun(I,D) -> (p_seq([p_string(<<"\"">>), p_zero_or_more(p_charclass(<<"[a-zA-Z@0-9.:=_\\s\t\\/-]">>)), p_string(<<"\"">>)]))(I,D) end, fun(Node, Idx) -> 
     list_to_binary(binary_to_list(iolist_to_binary(Node))--[34,34])
  end).
 
