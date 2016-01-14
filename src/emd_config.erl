@@ -60,12 +60,12 @@ parse(Input) when is_binary(Input) ->
  end).
 
 'word'(Input, Index) ->
-  p(Input, Index, 'word', fun(I,D) -> (p_one_or_more(p_charclass(<<"[a-zA-Z0-9?@_.-]">>)))(I,D) end, fun(Node, Idx) -> 
+  p(Input, Index, 'word', fun(I,D) -> (p_one_or_more(p_charclass(<<"[a-zA-Z0-9?@_.->]">>)))(I,D) end, fun(Node, Idx) -> 
     iolist_to_binary(Node)
  end).
 
 'argv'(Input, Index) ->
-  p(Input, Index, 'argv', fun(I,D) -> (p_seq([p_string(<<"\"">>), p_zero_or_more(p_charclass(<<"[a-zA-Z@0-9.:=_\\s\t\\/-]">>)), p_string(<<"\"">>)]))(I,D) end, fun(Node, Idx) -> 
+  p(Input, Index, 'argv', fun(I,D) -> (p_seq([p_string(<<"\"">>), p_zero_or_more(p_charclass(<<"[a-zA-Z@0-9.:=_\\s\t\\/->]">>)), p_string(<<"\"">>)]))(I,D) end, fun(Node, Idx) -> 
     list_to_binary(binary_to_list(iolist_to_binary(Node))--[34,34])
  end).
 
