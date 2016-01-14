@@ -60,7 +60,7 @@ parse(Input) when is_binary(Input) ->
  end).
 
 'word'(Input, Index) ->
-  p(Input, Index, 'word', fun(I,D) -> (p_one_or_more(p_charclass(<<"[a-zA-Z0-9?@_.->]">>)))(I,D) end, fun(Node, Idx) -> 
+  p(Input, Index, 'word', fun(I,D) -> (p_one_or_more(p_charclass(<<"[a-zA-Z0-9?@_.-]">>)))(I,D) end, fun(Node, Idx) -> 
     iolist_to_binary(Node)
  end).
 
